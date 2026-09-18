@@ -6,6 +6,7 @@ import Card from '../common/Card';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
+import * as XLSX from 'xlsx';
 
 interface CustomerFormData {
   first_name: string;
@@ -52,6 +53,10 @@ const CustomerManagement: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
+
+  // Excel Import State
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -180,6 +185,139 @@ const CustomerManagement: React.FC = () => {
     }
   };
 
+  // ============================
+  // Excel Import Handler
+  // ============================
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    e.target.value = '';
+
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+    setMessage(null);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      if (rows.length === 0) {
+        setMessage({ type: 'error', text: '⚠️ Excel file ma koi data nathi.' });
+        setImporting(false);
+        return;
+      }
+
+      setImportProgress({ current: 0, total: rows.length });
+
+      let successCount = 0;
+      let failCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        setImportProgress({ current: i + 1, total: rows.length });
+
+        const firstName = String(row.first_name || row.firstName || row.FirstName || '').trim();
+        const lastName = String(row.last_name || row.lastName || row.LastName || '').trim();
+        const mobileNumber = String(row.mobile_number || row.mobileNumber || row.mobile || row.Mobile || '').trim();
+        const whatsappNumber = String(row.whatsapp_number || row.whatsappNumber || row.whatsapp || '').trim();
+        const address = String(row.address || row.Address || '').trim();
+        const city = String(row.city || row.City || '').trim();
+        const state = String(row.state || row.State || '').trim();
+        const vehicleNumber = String(row.vehicle_number || row.vehicleNumber || row.vehicle || '').trim();
+        const vehicleModel = String(row.vehicle_model || row.vehicleModel || row.model || '').trim();
+
+        // Validate required fields
+        if (!firstName || !lastName || !mobileNumber || !vehicleNumber || !vehicleModel) {
+          failCount++;
+          errors.push(`Row ${i + 2}: Missing required fields (first_name, last_name, mobile_number, vehicle_number, vehicle_model)`);
+          continue;
+        }
+
+        try {
+          const result = await addItem(COLLECTIONS.CUSTOMERS, {
+            first_name: firstName,
+            last_name: lastName,
+            mobile_number: mobileNumber,
+            whatsapp_number: whatsappNumber,
+            address,
+            city,
+            state,
+            vehicle_number: vehicleNumber,
+            vehicle_model: vehicleModel,
+            created_at: new Date().toISOString(),
+          });
+
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+            errors.push(`Row ${i + 2} (${firstName} ${lastName}): ${result.error || 'Unknown error'}`);
+          }
+        } catch (err: any) {
+          failCount++;
+          errors.push(`Row ${i + 2} (${firstName} ${lastName}): ${err?.message || 'Unknown error'}`);
+        }
+      }
+
+      await refreshData();
+
+      if (failCount === 0) {
+        setMessage({ type: 'success', text: `✅ Badha ${successCount} customers successfully import thaya!` });
+      } else {
+        setMessage({
+          type: 'error',
+          text: `⚠️ ${successCount} success, ${failCount} fail. ${errors.slice(0, 3).join(' | ')}${errors.length > 3 ? ' ...' : ''}`
+        });
+      }
+    } catch (err) {
+      console.error('Excel import error:', err);
+      setMessage({ type: 'error', text: '❌ Excel file read karvama error aavyo.' });
+    } finally {
+      setImporting(false);
+      setImportProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // ============================
+  // Download Sample Excel Template
+  // ============================
+  const downloadSampleExcel = () => {
+    const sampleData = [
+      {
+        first_name: 'John',
+        last_name: 'Doe',
+        mobile_number: '9876543210',
+        whatsapp_number: '9876543210',
+        address: '123 Main Street',
+        city: 'Ahmedabad',
+        state: 'Gujarat',
+        vehicle_number: 'GJ01AB1234',
+        vehicle_model: 'Tata Ace',
+      },
+      {
+        first_name: 'Jane',
+        last_name: 'Smith',
+        mobile_number: '9876543211',
+        whatsapp_number: '9876543211',
+        address: '456 Park Road',
+        city: 'Surat',
+        state: 'Gujarat',
+        vehicle_number: 'GJ05CD5678',
+        vehicle_model: 'Mahindra Bolero',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Customers');
+    XLSX.writeFile(workbook, 'sample_customers.xlsx');
+  };
+
   const handleViewDetails = (customer: any) => {
     setSelectedCustomerId(customer.id);
     setSelectedCustomerName(`${customer.first_name} ${customer.last_name}`);
@@ -234,15 +372,45 @@ const CustomerManagement: React.FC = () => {
           <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 tracking-tight">Customer Management</h1>
           <p className="text-gray-500 mt-1">Manage and track your customer relationships dynamically.</p>
         </div>
-        <Button 
-          onClick={handleOpenAddModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add New Customer
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={downloadSampleExcel}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-2 text-sm"
+          >
+            📥 Sample Excel
+          </Button>
+          <label className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-green-200 transition-all flex items-center gap-2 cursor-pointer text-sm ${importing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            {importing ? (
+              <>
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {importProgress.total > 0
+                  ? `${importProgress.current}/${importProgress.total}`
+                  : 'Importing...'}
+              </>
+            ) : (
+              <>📤 Import Excel</>
+            )}
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleExcelImport}
+              disabled={importing}
+              className="hidden"
+            />
+          </label>
+          <Button 
+            onClick={handleOpenAddModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 text-sm"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Customer
+          </Button>
+        </div>
       </div>
       
       {message && (
@@ -251,37 +419,38 @@ const CustomerManagement: React.FC = () => {
         }`}>
           <div className="flex items-center gap-3">
             {message.type === 'success' ? (
-              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             )}
-            <span className="font-medium">{message.text}</span>
+            <span className="font-medium text-sm break-words">{message.text}</span>
           </div>
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats Cards - 2 cols on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: 'Total Customers', value: stats.totalCustomers, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Active Assignments', value: stats.totalAssignments, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Service Records', value: stats.totalServices, color: 'text-purple-600', bg: 'bg-purple-50' },
           { label: 'Expiring This Month', value: stats.expiringThisMonth, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((stat, i) => (
-          <Card key={i} className="relative overflow-hidden group hover:shadow-md transition-shadow">
-            <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full ${stat.bg} opacity-50 group-hover:scale-110 transition-transform`}></div>
-            <div className={`text-3xl font-black ${stat.color}`}>{stat.value}</div>
-            <div className="text-gray-500 font-medium text-sm mt-1">{stat.label}</div>
+          <Card key={i} className="relative overflow-hidden group hover:shadow-md transition-shadow !p-4 md:!p-6">
+            <div className={`absolute top-0 right-0 w-16 h-16 md:w-24 md:h-24 -mr-6 -mt-6 md:-mr-8 md:-mt-8 rounded-full ${stat.bg} opacity-50 group-hover:scale-110 transition-transform`}></div>
+            <div className={`text-2xl md:text-3xl font-black ${stat.color}`}>{stat.value}</div>
+            <div className="text-gray-500 font-medium text-xs md:text-sm mt-1 leading-tight">{stat.label}</div>
           </Card>
         ))}
       </div>
       
-      <Card className="border-none shadow-xl shadow-gray-100 overflow-hidden">
+      <Card className="border-none shadow-xl shadow-gray-100 overflow-hidden !p-4 md:!p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <h2 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2">
             <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
@@ -291,7 +460,7 @@ const CustomerManagement: React.FC = () => {
             <input
               type="text"
               placeholder="Search by name, phone or vehicle..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -301,7 +470,13 @@ const CustomerManagement: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto -mx-6">
+        {/* Excel Format Hint */}
+        <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 break-words">
+          <strong>Excel Format:</strong> Columns — <code className="bg-blue-100 px-1 rounded">first_name</code>, <code className="bg-blue-100 px-1 rounded">last_name</code>, <code className="bg-blue-100 px-1 rounded">mobile_number</code>, <code className="bg-blue-100 px-1 rounded">whatsapp_number</code>, <code className="bg-blue-100 px-1 rounded">address</code>, <code className="bg-blue-100 px-1 rounded">city</code>, <code className="bg-blue-100 px-1 rounded">state</code>, <code className="bg-blue-100 px-1 rounded">vehicle_number</code>, <code className="bg-blue-100 px-1 rounded">vehicle_model</code>
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto -mx-6">
           <table className="min-w-full divide-y divide-gray-100">
             <thead>
               <tr className="bg-gray-50/50">
@@ -313,7 +488,7 @@ const CustomerManagement: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-50">
               {paginatedCustomers.length > 0 ? (
-                paginatedCustomers.map((customer, idx) => (
+                paginatedCustomers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-blue-50/30 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -405,10 +580,101 @@ const CustomerManagement: React.FC = () => {
           </table>
         </div>
 
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
+          {paginatedCustomers.length > 0 ? (
+            paginatedCustomers.map((customer) => (
+              <div key={customer.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                {/* Header: Avatar + Name */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="h-12 w-12 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-inner">
+                    {customer.first_name[0]}{customer.last_name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-base font-bold text-gray-900 truncate">
+                      {customer.first_name} {customer.last_name}
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      <span className="truncate">{customer.mobile_number}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehicle Info */}
+                <div className="grid grid-cols-2 gap-2 mb-3 pb-3 border-b border-gray-100">
+                  <div>
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Vehicle No.</div>
+                    <div className="text-sm font-semibold text-gray-800 truncate">{customer.vehicle_number}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model</div>
+                    <div className="text-sm font-semibold text-gray-800 truncate">{customer.vehicle_model}</div>
+                  </div>
+                </div>
+
+                {/* Activity Badges */}
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    {customer.products?.length || 0} Products
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                    {customer.services?.length || 0} Services
+                  </span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleViewDetails(customer)}
+                    className="flex-1 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition flex items-center justify-center gap-1"
+                  >
+                    👁️ View
+                  </button>
+                  <button
+                    onClick={() => handleOpenEditModal(customer)}
+                    className="flex-1 px-3 py-2 text-xs font-bold text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition flex items-center justify-center gap-1"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCustomer(customer.id, customer.first_name)}
+                    disabled={deletingId === customer.id}
+                    className="flex-1 px-3 py-2 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    {deletingId === customer.id ? (
+                      <>
+                        <div className="animate-spin h-3 w-3 border-2 border-red-600 border-t-transparent rounded-full"></div>
+                        ...
+                      </>
+                    ) : (
+                      <>🗑️ Delete</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-16">
+              <div className="flex flex-col items-center">
+                <div className="bg-gray-100 p-4 rounded-full mb-4">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 font-medium text-sm">No customers found.</p>
+                <button onClick={() => setSearchTerm('')} className="mt-2 text-blue-600 font-bold hover:underline text-sm">Clear Search</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Pagination Controls */}
         {filteredCustomers.length > 0 && (
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-6 pt-6 mt-2 border-t border-gray-100">
-            <div className="flex items-center gap-3 text-sm text-gray-500">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 mt-2 border-t border-gray-100">
+            <div className="flex items-center gap-3 text-xs md:text-sm text-gray-500">
               <span>
                 Showing <span className="font-semibold text-gray-700">{rangeStart}</span>–
                 <span className="font-semibold text-gray-700">{rangeEnd}</span> of{' '}
@@ -417,7 +683,7 @@ const CustomerManagement: React.FC = () => {
               <select
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="border border-gray-200 rounded-lg text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-gray-200 rounded-lg text-xs md:text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
                   <option key={size} value={size}>{size} / page</option>
@@ -449,12 +715,12 @@ const CustomerManagement: React.FC = () => {
 
               {pageNumbers.map((p, i) =>
                 p === 'ellipsis' ? (
-                  <span key={`ellipsis-${i}`} className="px-2 text-gray-400 select-none">…</span>
+                  <span key={`ellipsis-${i}`} className="px-1 md:px-2 text-gray-400 select-none">…</span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => goToPage(p)}
-                    className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-bold transition-colors ${
+                    className={`min-w-[32px] md:min-w-[36px] h-8 md:h-9 px-2 rounded-lg text-xs md:text-sm font-bold transition-colors ${
                       p === currentPage
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                         : 'text-gray-600 hover:bg-gray-100'
@@ -491,10 +757,10 @@ const CustomerManagement: React.FC = () => {
       </Card>
       
       {selectedCustomerId && (
-        <Card title={`Customer Insights: ${selectedCustomerName}`} className="border-l-4 border-l-blue-600 animate-in slide-in-from-bottom-8 duration-500 shadow-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 p-6 rounded-2xl">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <Card title={`Customer Insights: ${selectedCustomerName}`} className="border-l-4 border-l-blue-600 animate-in slide-in-from-bottom-8 duration-500 shadow-2xl !p-4 md:!p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+            <div className="bg-gray-50 p-4 md:p-6 rounded-2xl">
+              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm md:text-base">
                 <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
@@ -503,8 +769,8 @@ const CustomerManagement: React.FC = () => {
               {getCustomerProducts(selectedCustomerId).length > 0 ? (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {getCustomerProducts(selectedCustomerId).map(product => (
-                    <div key={product.id} className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                      <div className="font-bold text-blue-900">{product.product_name}</div>
+                    <div key={product.id} className="p-3 md:p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                      <div className="font-bold text-blue-900 text-sm md:text-base">{product.product_name}</div>
                       <div className="grid grid-cols-2 mt-2 gap-2">
                         <div className="text-xs text-gray-500">
                           <div className="font-medium text-gray-400">PURCHASED</div>
@@ -519,12 +785,12 @@ const CustomerManagement: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-10 text-gray-400 italic">No products assigned to this customer yet.</div>
+                <div className="text-center py-10 text-gray-400 italic text-sm">No products assigned to this customer yet.</div>
               )}
             </div>
             
-            <div className="bg-gray-50 p-6 rounded-2xl">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <div className="bg-gray-50 p-4 md:p-6 rounded-2xl">
+              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm md:text-base">
                 <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
@@ -533,16 +799,16 @@ const CustomerManagement: React.FC = () => {
               {getCustomerServices(selectedCustomerId).length > 0 ? (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {getCustomerServices(selectedCustomerId).map(service => (
-                    <div key={service.id} className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                      <div className="flex justify-between items-start">
-                        <div className="font-bold text-green-900">{service.service_type}</div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                    <div key={service.id} className="p-3 md:p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="font-bold text-green-900 text-sm md:text-base">{service.service_type}</div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0 ${
                           service.service_status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                         }`}>
                           {service.service_status}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
                         <span className="font-bold">{formatDate(service.service_date)}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-300"></span>
                         <span>{service.product_name}</span>
@@ -551,15 +817,15 @@ const CustomerManagement: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-10 text-gray-400 italic">No service history records found.</div>
+                <div className="text-center py-10 text-gray-400 italic text-sm">No service history records found.</div>
               )}
             </div>
           </div>
           
-          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+          <div className="mt-6 md:mt-8 pt-6 border-t border-gray-100 flex justify-end">
             <button
               onClick={() => setSelectedCustomerId(null)}
-              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-sm"
             >
               Close Details
             </button>
@@ -642,10 +908,10 @@ const CustomerManagement: React.FC = () => {
             onChange={handleInputChange} 
           />
           
-          <div className="pt-4 flex gap-3">
+          <div className="pt-4 flex flex-col sm:flex-row gap-3">
             <Button 
               type="submit" 
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg order-1 sm:order-1"
               disabled={operationLoading}
             >
               {operationLoading ? 'Processing...' : editingCustomer ? 'Update Customer' : 'Save Customer'}
@@ -653,7 +919,7 @@ const CustomerManagement: React.FC = () => {
             <Button 
               type="button" 
               onClick={() => setIsModalOpen(false)}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 rounded-xl"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 rounded-xl order-2 sm:order-2"
             >
               Cancel
             </Button>

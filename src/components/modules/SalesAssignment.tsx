@@ -340,31 +340,31 @@ const SalesAssignment: React.FC = () => {
   };
   
   return (
-    <div className="space-y-6 px-4 md:px-0">
+    <div className="space-y-4 md:space-y-6 px-4 md:px-0">
       <h1 className="text-xl md:text-3xl font-bold text-gray-800">
         {editingAssignment ? 'Edit Assignment' : 'New Sales Assignment'}
       </h1>
       
       {!meta.isOnline && (
         <div className="p-3 bg-yellow-100 text-yellow-800 rounded-lg flex items-center">
-          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
-          You are offline. Data will sync when connection is restored.
+          <span className="text-sm">You are offline. Data will sync when connection is restored.</span>
         </div>
       )}
       
       {message && (
-        <div className={`p-4 rounded-lg font-medium ${
+        <div className={`p-3 md:p-4 rounded-lg font-medium text-sm break-words ${
           message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
         }`}>
           {message.text}
         </div>
       )}
       
-      <form onSubmit={handleSaveAssignment} className="space-y-6">
-        <Card title="Customer Identification">
-          <div className="flex flex-col md:flex-row md:space-x-6 space-y-4 md:space-y-0">
+      <form onSubmit={handleSaveAssignment} className="space-y-4 md:space-y-6">
+        <Card title="Customer Identification" className="!p-4 md:!p-6">
+          <div className="flex flex-col md:flex-row md:space-x-6 space-y-3 md:space-y-0">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="radio"
@@ -376,9 +376,9 @@ const SalesAssignment: React.FC = () => {
                   setSelectedCustomerId('');
                 }}
                 disabled={isSubmitting || editingAssignment !== null}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0"
               />
-              <span className="text-gray-700 font-medium">New Customer</span>
+              <span className="text-gray-700 font-medium text-sm md:text-base">New Customer</span>
             </label>
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
@@ -394,16 +394,16 @@ const SalesAssignment: React.FC = () => {
                   });
                 }}
                 disabled={isSubmitting || editingAssignment !== null}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0"
               />
-              <span className="text-gray-700 font-medium">Existing Customer</span>
+              <span className="text-gray-700 font-medium text-sm md:text-base">Existing Customer</span>
             </label>
           </div>
         </Card>
         
-        <Card title={customerType === 'new' ? "New Customer Details" : "Select Existing Customer"}>
+        <Card title={customerType === 'new' ? "New Customer Details" : "Select Existing Customer"} className="!p-4 md:!p-6">
           {customerType === 'new' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               <Input 
                 label="First Name" 
                 name="first_name" 
@@ -465,7 +465,7 @@ const SalesAssignment: React.FC = () => {
                 onChange={handleCustomerChange} 
                 disabled={isSubmitting}
               />
-              <div className="md:col-span-3">
+              <div className="sm:col-span-2 md:col-span-3">
                 <Input 
                   label="Address" 
                   name="address" 
@@ -488,8 +488,8 @@ const SalesAssignment: React.FC = () => {
           )}
         </Card>
         
-        <Card title="Product Assignment">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card title="Product Assignment" className="!p-4 md:!p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             <Select 
               label="Product" 
               name="product_id" 
@@ -523,7 +523,7 @@ const SalesAssignment: React.FC = () => {
               value={formatDate(mappingData.warranty_expiry_date || '')} 
               disabled 
             />
-            <div className="md:col-span-2">
+            <div className="sm:col-span-2 md:col-span-2">
               <Input 
                 label="Notes" 
                 name="notes" 
@@ -535,11 +535,11 @@ const SalesAssignment: React.FC = () => {
           </div>
         </Card>
         
-        <div className="flex justify-center space-x-4">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:space-x-4">
           <Button 
             type="submit" 
             color="blue" 
-            className="w-full md:w-64 py-3 text-lg font-bold"
+            className="w-full sm:w-64 py-3 text-base md:text-lg font-bold"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
@@ -554,7 +554,7 @@ const SalesAssignment: React.FC = () => {
             <Button 
               type="button" 
               color="gray" 
-              className="w-full md:w-64 py-3 text-lg font-bold"
+              className="w-full sm:w-64 py-3 text-base md:text-lg font-bold"
               onClick={handleCancelEdit}
               disabled={isSubmitting}
             >
@@ -565,8 +565,9 @@ const SalesAssignment: React.FC = () => {
       </form>
       
       {/* Recent Assignments Table */}
-      <Card title="Product Assignments">
-        <div className="overflow-x-auto">
+      <Card title="Product Assignments" className="!p-4 md:!p-6">
+        {/* ── Desktop Table View ─────────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -656,10 +657,94 @@ const SalesAssignment: React.FC = () => {
           </table>
         </div>
 
+        {/* ── Mobile Card View ──────────────────────────────── */}
+        <div className="md:hidden space-y-3">
+          {paginatedAssignments.length > 0 ? (
+            paginatedAssignments.map((assignment) => {
+              const isExpired = new Date(assignment.warranty_expiry_date) < new Date();
+              const isExpiringSoon = !isExpired && new Date(assignment.warranty_expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              const customerName = getCustomerName(assignment.customer_id);
+              const productName = getProductName(assignment.product_id);
+
+              return (
+                <div key={assignment.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  {/* Header: Customer + Status Badge */}
+                  <div className="flex justify-between items-start gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-gray-900 truncate">
+                        {customerName}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5 truncate">
+                        📦 {productName}
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${
+                      isExpired ? 'bg-red-100 text-red-800' : 
+                      isExpiringSoon ? 'bg-yellow-100 text-yellow-800' : 
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {isExpired ? 'Expired' : isExpiringSoon ? 'Expiring' : 'Active'}
+                    </span>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Purchase</div>
+                      <div className="text-gray-800 font-semibold">
+                        {formatDate(assignment.product_purchase_date)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Expiry</div>
+                      <div className={`font-semibold ${
+                        isExpired ? 'text-red-600' : 
+                        isExpiringSoon ? 'text-orange-600' : 
+                        'text-green-600'
+                      }`}>
+                        {formatDate(assignment.warranty_expiry_date)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => handleEditAssignment(assignment)}
+                      disabled={deletingId === assignment.id || isSubmitting}
+                      className="flex-1 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAssignment(assignment.id, customerName, productName)}
+                      disabled={deletingId === assignment.id || isSubmitting}
+                      className="flex-1 px-3 py-2 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition"
+                    >
+                      {deletingId === assignment.id ? (
+                        <span className="inline-flex items-center justify-center">
+                          <span className="inline-block animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></span>
+                          Deleting...
+                        </span>
+                      ) : (
+                        '🗑️ Delete'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              No assignments found. Create your first assignment above.
+            </div>
+          )}
+        </div>
+
         {/* Pagination Controls */}
         {orderedAssignments.length > 0 && (
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 mt-4 border-t border-gray-100">
-            <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="flex items-center gap-3 text-xs md:text-sm text-gray-500">
               <span>
                 Showing <span className="font-semibold text-gray-700">{rangeStart}</span>–
                 <span className="font-semibold text-gray-700">{rangeEnd}</span> of{' '}
@@ -668,7 +753,7 @@ const SalesAssignment: React.FC = () => {
               <select
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="border border-gray-200 rounded-lg text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-gray-200 rounded-lg text-xs md:text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
                   <option key={size} value={size}>{size} / page</option>
@@ -676,11 +761,11 @@ const SalesAssignment: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap justify-center">
               <button
                 onClick={() => goToPage(1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="First page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -690,7 +775,7 @@ const SalesAssignment: React.FC = () => {
               <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Previous page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -700,12 +785,12 @@ const SalesAssignment: React.FC = () => {
 
               {pageNumbers.map((p, i) =>
                 p === 'ellipsis' ? (
-                  <span key={`ellipsis-${i}`} className="px-2 text-gray-400 select-none">…</span>
+                  <span key={`ellipsis-${i}`} className="px-1 md:px-2 text-gray-400 select-none">…</span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => goToPage(p)}
-                    className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-bold transition-colors ${
+                    className={`min-w-[32px] h-8 md:min-w-[36px] md:h-9 px-2 rounded-lg text-xs md:text-sm font-bold transition-colors ${
                       p === currentPage
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                         : 'text-gray-600 hover:bg-gray-100'
@@ -719,7 +804,7 @@ const SalesAssignment: React.FC = () => {
               <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Next page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -729,7 +814,7 @@ const SalesAssignment: React.FC = () => {
               <button
                 onClick={() => goToPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Last page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -236,19 +236,19 @@ const ServiceMaster: React.FC = () => {
   ];
   
   return (
-    <div className="space-y-6 px-4 md:px-0">
+    <div className="space-y-4 md:space-y-6 px-4 md:px-0">
       <h1 className="text-xl md:text-3xl font-bold text-gray-800">Service Master</h1>
       
       {message && (
-        <div className={`p-3 rounded-lg ${
+        <div className={`p-3 rounded-lg text-sm break-words ${
           message.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
         }`}>
           {message.text}
         </div>
       )}
       
-      <Card title={isEditing ? 'Edit Service Record' : 'Add New Service Record'}>
-        <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card title={isEditing ? 'Edit Service Record' : 'Add New Service Record'} className="!p-4 md:!p-6">
+        <form onSubmit={handleSave} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           <Select 
             label="Customer" 
             name="customer_id" 
@@ -302,7 +302,7 @@ const ServiceMaster: React.FC = () => {
             type="date" 
             disabled={isSubmitting || operationLoading}
           />
-          <div className="md:col-span-3">
+          <div className="sm:col-span-2 md:col-span-3">
             <Input 
               label="Service Notes" 
               name="service_notes" 
@@ -312,7 +312,7 @@ const ServiceMaster: React.FC = () => {
             />
           </div>
           
-          <div className="md:col-span-3 flex justify-end space-x-3">
+          <div className="sm:col-span-2 md:col-span-3 flex flex-col sm:flex-row sm:justify-end gap-3">
             <Button 
               type="submit" 
               color="green"
@@ -337,8 +337,9 @@ const ServiceMaster: React.FC = () => {
         </form>
       </Card>
       
-      <Card title="Service History">
-        <div className="overflow-x-auto">
+      <Card title="Service History" className="!p-4 md:!p-6">
+        {/* ── Desktop Table View ─────────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -412,10 +413,99 @@ const ServiceMaster: React.FC = () => {
           </table>
         </div>
 
+        {/* ── Mobile Card View ──────────────────────────────── */}
+        <div className="md:hidden space-y-3">
+          {paginatedServices.length > 0 ? (
+            paginatedServices.map(service => (
+              <div key={service.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                {/* Header: Customer + Status Badge */}
+                <div className="flex justify-between items-start gap-2 mb-3 pb-3 border-b border-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-gray-900 truncate">
+                      {service.customer_name}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 truncate">
+                      📦 {service.product_name}
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase flex-shrink-0 ${
+                    service.service_status === 'Completed' ? 'bg-green-100 text-green-800' :
+                    service.service_status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {service.service_status}
+                  </span>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div>
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Service Date</div>
+                    <div className="text-gray-800 font-semibold">
+                      {formatDate(service.service_date)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Type</div>
+                    <div className="text-gray-800 font-semibold truncate">
+                      {service.service_type}
+                    </div>
+                  </div>
+                  {service.next_service_date && (
+                    <div className="col-span-2">
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Next Service</div>
+                      <div className="text-gray-800 font-semibold">
+                        {formatDate(service.next_service_date)}
+                      </div>
+                    </div>
+                  )}
+                  {service.service_notes && (
+                    <div className="col-span-2">
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Notes</div>
+                      <div className="text-gray-700 text-xs break-words">
+                        {service.service_notes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => handleEdit(service)}
+                    disabled={deletingId === service.id || operationLoading || isSubmitting}
+                    className="flex-1 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(service.id)}
+                    disabled={deletingId === service.id || operationLoading || isSubmitting}
+                    className="flex-1 px-3 py-2 text-xs font-bold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition"
+                  >
+                    {deletingId === service.id ? (
+                      <span className="inline-flex items-center justify-center">
+                        <span className="inline-block animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></span>
+                        Deleting...
+                      </span>
+                    ) : (
+                      '🗑️ Delete'
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              No service records found. Add your first service record above.
+            </div>
+          )}
+        </div>
+
         {/* Pagination Controls */}
         {services.length > 0 && (
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 mt-4 border-t border-gray-100">
-            <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="flex items-center gap-3 text-xs md:text-sm text-gray-500">
               <span>
                 Showing <span className="font-semibold text-gray-700">{rangeStart}</span>–
                 <span className="font-semibold text-gray-700">{rangeEnd}</span> of{' '}
@@ -424,7 +514,7 @@ const ServiceMaster: React.FC = () => {
               <select
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="border border-gray-200 rounded-lg text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-gray-200 rounded-lg text-xs md:text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PAGE_SIZE_OPTIONS.map(size => (
                   <option key={size} value={size}>{size} / page</option>
@@ -432,11 +522,11 @@ const ServiceMaster: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap justify-center">
               <button
                 onClick={() => goToPage(1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="First page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -446,7 +536,7 @@ const ServiceMaster: React.FC = () => {
               <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Previous page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -456,12 +546,12 @@ const ServiceMaster: React.FC = () => {
 
               {pageNumbers.map((p, i) =>
                 p === 'ellipsis' ? (
-                  <span key={`ellipsis-${i}`} className="px-2 text-gray-400 select-none">…</span>
+                  <span key={`ellipsis-${i}`} className="px-1 md:px-2 text-gray-400 select-none">…</span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => goToPage(p)}
-                    className={`min-w-[36px] h-9 px-2 rounded-lg text-sm font-bold transition-colors ${
+                    className={`min-w-[32px] h-8 md:min-w-[36px] md:h-9 px-2 rounded-lg text-xs md:text-sm font-bold transition-colors ${
                       p === currentPage
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                         : 'text-gray-600 hover:bg-gray-100'
@@ -475,7 +565,7 @@ const ServiceMaster: React.FC = () => {
               <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Next page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -485,7 +575,7 @@ const ServiceMaster: React.FC = () => {
               <button
                 onClick={() => goToPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 md:p-2 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Last page"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db, auth } from '../lib/firebase';
 import { doc, setDoc, getDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import MainLayout from '../components/layouts/MainLayout';
+import * as XLSX from 'xlsx';
 
 // ✅ Already initialized Firebase app thi apiKey lo - no .env needed
 const createUserViaRestAPI = async (email: string, password: string): Promise<string> => {
@@ -98,6 +99,10 @@ const AddUserPage = () => {
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Excel Import State
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   // Access Modal
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -281,6 +286,143 @@ const AddUserPage = () => {
     }
   };
 
+  // ============================
+  // Excel Import Handler
+  // ============================
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0 });
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      if (rows.length === 0) {
+        showMessage('error', '⚠️ Excel file ma koi data nathi.');
+        setImporting(false);
+        return;
+      }
+
+      setImportProgress({ current: 0, total: rows.length });
+
+      let successCount = 0;
+      let failCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        setImportProgress({ current: i + 1, total: rows.length });
+
+        const email = String(row.email || row.Email || '').trim();
+        const password = String(row.password || row.Password || '').trim();
+        const displayName = String(row.displayName || row.name || row.Name || row.display_name || '').trim();
+        const role = String(row.role || row.Role || 'user').trim().toLowerCase();
+
+        if (!email || !password || !displayName) {
+          failCount++;
+          errors.push(`Row ${i + 2}: Missing email/password/displayName`);
+          continue;
+        }
+
+        if (password.length < 6) {
+          failCount++;
+          errors.push(`Row ${i + 2}: Password too short (min 6)`);
+          continue;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          failCount++;
+          errors.push(`Row ${i + 2}: Invalid email (${email})`);
+          continue;
+        }
+
+        const validRoles = ['user', 'manager', 'admin', 'viewer'];
+        const finalRole = validRoles.includes(role) ? role : 'user';
+
+        try {
+          const newUid = await createUserViaRestAPI(email, password);
+
+          const permDoc = await getDoc(doc(db, 'permissions', finalRole));
+          const rolePermissions = permDoc.exists()
+            ? permDoc.data().pages
+            : getDefaultPermissions(finalRole);
+
+          const userData = {
+            uid: newUid,
+            email,
+            displayName,
+            role: finalRole,
+            createdAt: new Date().toISOString(),
+            createdBy: currentUser?.uid || 'system',
+            isActive: true,
+            permissions: rolePermissions,
+          };
+
+          await setDoc(doc(db, 'users', newUid), userData);
+          successCount++;
+        } catch (err: any) {
+          failCount++;
+          const errMsg = err?.code === 'auth/email-already-in-use'
+            ? 'Email already exists'
+            : err?.message || 'Unknown error';
+          errors.push(`Row ${i + 2} (${email}): ${errMsg}`);
+        }
+      }
+
+      loadUsers();
+
+      if (failCount === 0) {
+        showMessage('success', `✅ Badha ${successCount} users successfully import thaya!`);
+      } else {
+        showMessage(
+          'error',
+          `⚠️ ${successCount} success, ${failCount} fail. ${errors.slice(0, 3).join(' | ')}${errors.length > 3 ? ' ...' : ''}`
+        );
+      }
+    } catch (err) {
+      console.error('Excel import error:', err);
+      showMessage('error', '❌ Excel file read karvama error aavyo.');
+    } finally {
+      setImporting(false);
+      setImportProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // ============================
+  // Download Sample Excel Template
+  // ============================
+  const downloadSampleExcel = () => {
+    const sampleData = [
+      {
+        displayName: 'John Doe',
+        email: 'john@example.com',
+        password: 'password123',
+        role: 'user',
+      },
+      {
+        displayName: 'Jane Smith',
+        email: 'jane@example.com',
+        password: 'password123',
+        role: 'manager',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+    XLSX.writeFile(workbook, 'sample_users.xlsx');
+  };
+
   const handleDeleteUser = async (userId: string, userEmail: string) => {
     if (!window.confirm(`"${userEmail}" ne delete karva sure cho? Aa action undo nahi thay.`)) return;
     try {
@@ -370,7 +512,49 @@ const AddUserPage = () => {
 
           {/* Add User Form */}
           <div className="bg-white rounded-2xl shadow-sm border p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-800 mb-5">➕ Add New User</h2>
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">➕ Add New User</h2>
+
+              {/* Excel Import Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={downloadSampleExcel}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+                >
+                  📥 Sample Excel
+                </button>
+
+                <label className={`flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium cursor-pointer ${importing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                  {importing ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      {importProgress.total > 0
+                        ? `Importing ${importProgress.current}/${importProgress.total}...`
+                        : 'Importing...'}
+                    </>
+                  ) : (
+                    <>📤 Import Excel</>
+                  )}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleExcelImport}
+                    disabled={importing}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Excel Format Hint */}
+            <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+              <strong>Excel Format:</strong> Columns — <code className="bg-blue-100 px-1 rounded">displayName</code>, <code className="bg-blue-100 px-1 rounded">email</code>, <code className="bg-blue-100 px-1 rounded">password</code>, <code className="bg-blue-100 px-1 rounded">role</code> (user/manager/admin/viewer)
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

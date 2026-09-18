@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useUnifiedData } from "../../contexts/UnifiedDataContext";
 import { COLLECTIONS } from "../../types";
 import { formatDate } from "../../lib/utils";
@@ -14,6 +14,9 @@ const AdminDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
 
+  // ── Track if we opened WhatsApp (to refresh when we come back) ──
+  const pendingWhatsAppRefresh = useRef<boolean>(false);
+
   // ── Auto-refresh on mount / when page becomes visible again ───
   useEffect(() => {
     refreshData();
@@ -21,6 +24,11 @@ const AdminDashboard: React.FC = () => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         refreshData();
+        // If we had opened WhatsApp, extra refresh to be safe
+        if (pendingWhatsAppRefresh.current) {
+          pendingWhatsAppRefresh.current = false;
+          setTimeout(() => refreshData(), 500);
+        }
       }
     };
 
@@ -59,10 +67,12 @@ Tank Testing Plant`;
         });
 
         if (result.success) {
+          // ✅ Mark that we opened WhatsApp — will refresh when user returns
+          pendingWhatsAppRefresh.current = true;
+
           sendWhatsAppReminder(customerName, vehicleNumber, expiryDate, productName);
-          alert(`✅ WhatsApp reminder sent successfully to ${customerName}`);
           await refreshData();
-          alert(`📊 Data refreshed successfully!`);
+          alert(`✅ WhatsApp reminder sent successfully to ${customerName}`);
         } else {
           alert("❌ Error updating reminder status");
         }
@@ -191,7 +201,7 @@ Tank Testing Plant`;
         <div className="p-4 bg-yellow-100 text-yellow-800 rounded-lg border border-yellow-300">
           <div className="flex items-center">
             <svg
-              className="w-5 h-5 mr-2"
+              className="w-5 h-5 mr-2 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -201,55 +211,56 @@ Tank Testing Plant`;
                 clipRule="evenodd"
               />
             </svg>
-            <span>You are offline. Showing cached data.</span>
+            <span className="text-sm">You are offline. Showing cached data.</span>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="text-center">
-          <div className="text-3xl font-bold text-blue-600">
+      {/* Stats Cards - 2 cols on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Card className="text-center !p-4 md:!p-6">
+          <div className="text-2xl md:text-3xl font-bold text-blue-600">
             {stats.totalCustomers}
           </div>
-          <div className="text-gray-600">Total Customers</div>
+          <div className="text-gray-600 text-xs md:text-sm mt-1 leading-tight">Total Customers</div>
         </Card>
 
-        <Card className="text-center">
-          <div className="text-3xl font-bold text-green-600">
+        <Card className="text-center !p-4 md:!p-6">
+          <div className="text-2xl md:text-3xl font-bold text-green-600">
             {stats.totalAssignments}
           </div>
-          <div className="text-gray-600">Active Warranties</div>
+          <div className="text-gray-600 text-xs md:text-sm mt-1 leading-tight">Active Warranties</div>
         </Card>
 
-        <Card className="text-center">
-          <div className="text-3xl font-bold text-red-600">
+        <Card className="text-center !p-4 md:!p-6">
+          <div className="text-2xl md:text-3xl font-bold text-red-600">
             {stats.expiringThisWeek}
           </div>
-          <div className="text-gray-600">Expiring This Week</div>
+          <div className="text-gray-600 text-xs md:text-sm mt-1 leading-tight">Expiring This Week</div>
         </Card>
 
-        <Card className="text-center">
-          <div className="text-3xl font-bold text-purple-600">
+        <Card className="text-center !p-4 md:!p-6">
+          <div className="text-2xl md:text-3xl font-bold text-purple-600">
             {stats.pendingServices}
           </div>
-          <div className="text-gray-600">Pending Services</div>
+          <div className="text-gray-600 text-xs md:text-sm mt-1 leading-tight">Pending Services</div>
         </Card>
       </div>
 
-      <Card title="Warranty Expiry Reminders">
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-          <h3 className="text-lg font-semibold">
+      <Card title="Warranty Expiry Reminders" className="!p-4 md:!p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+          <h3 className="text-base md:text-lg font-semibold">
             Reminders for next {filterDays} days
-            <span className="ml-2 text-sm font-normal text-gray-500">
+            <span className="ml-2 text-xs md:text-sm font-normal text-gray-500">
               ({filteredReminders.length} reminders)
             </span>
           </h3>
 
-          <div className="flex space-x-2">
+          <div className="flex gap-2">
             <Button
               onClick={() => handleFilterChange(7)}
               color={filterDays === 7 ? "blue" : "gray"}
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none"
             >
               7 Days
             </Button>
@@ -257,7 +268,7 @@ Tank Testing Plant`;
             <Button
               onClick={() => handleFilterChange(15)}
               color={filterDays === 15 ? "blue" : "gray"}
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none"
             >
               15 Days
             </Button>
@@ -265,7 +276,7 @@ Tank Testing Plant`;
             <Button
               onClick={() => handleFilterChange(30)}
               color={filterDays === 30 ? "blue" : "gray"}
-              className="text-xs"
+              className="text-xs flex-1 sm:flex-none"
             >
               30 Days
             </Button>
@@ -273,13 +284,13 @@ Tank Testing Plant`;
         </div>
 
         {filteredReminders.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div className="p-4 text-center text-gray-500 text-sm">
             No warranties expiring in the next {filterDays} days
           </div>
         ) : (
           <>
-            {/* ── Table ─────────────────────────────────────────── */}
-            <div className="overflow-x-auto">
+            {/* ── Desktop Table ─────────────────────────────────── */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -379,11 +390,100 @@ Tank Testing Plant`;
               </table>
             </div>
 
+            {/* ── Mobile Card View ──────────────────────────────── */}
+            <div className="md:hidden space-y-3">
+              {currentReminders.map((reminder) => (
+                <div
+                  key={reminder.id}
+                  className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                >
+                  {/* Header: Customer + Days Badge */}
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-gray-900 truncate">
+                        {reminder.customer_name}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        🚗 {reminder.vehicle_number}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full font-bold flex-shrink-0 ${
+                        reminder.days_until_expiry <= 1
+                          ? "bg-red-100 text-red-800"
+                          : reminder.days_until_expiry <= 7
+                          ? "bg-orange-100 text-orange-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {reminder.days_until_expiry}d
+                    </span>
+                  </div>
+
+                  {/* Product + Expiry */}
+                  <div className="grid grid-cols-2 gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Product
+                      </div>
+                      <div className="text-xs font-semibold text-gray-800 truncate">
+                        {reminder.product_name}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Expiry
+                      </div>
+                      <div className="text-xs font-semibold text-gray-800">
+                        {formatDate(reminder.expiry_date)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status + Action */}
+                  <div className="flex items-center justify-between gap-2">
+                    {reminder.reminder_to_send ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                        Reminder due
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">
+                        Monitoring
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        handleSendReminder(
+                          reminder.id,
+                          reminder.customer_name,
+                          reminder.vehicle_number,
+                          reminder.expiry_date,
+                          reminder.product_name
+                        )
+                      }
+                      disabled={!meta.isOnline}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1 transition ${
+                        meta.isOnline
+                          ? "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
+                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
+                      {meta.isOnline ? "Send" : "Offline"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* ── Pagination Controls ──────────────────────────── */}
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-2">
                 {/* Info: Showing X to Y of Z */}
-                <div className="text-sm text-gray-700">
+                <div className="text-xs md:text-sm text-gray-700">
                   Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                   <span className="font-medium">
                     {Math.min(indexOfLastItem, totalItems)}
@@ -392,18 +492,18 @@ Tank Testing Plant`;
                 </div>
 
                 {/* Pagination Buttons */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap justify-center">
                   {/* Previous Button */}
                   <button
                     onClick={goToPreviousPage}
                     disabled={currentPage === 1}
-                    className={`px-3 py-1 rounded-md border ${
+                    className={`px-2 md:px-3 py-1 rounded-md border ${
                       currentPage === 1
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
                     }`}
                   >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </button>
@@ -413,7 +513,7 @@ Tank Testing Plant`;
                     <button
                       key={index}
                       onClick={() => typeof page === 'number' && goToPage(page)}
-                      className={`px-3 py-1 rounded-md border ${
+                      className={`min-w-[32px] h-8 md:min-w-[36px] md:h-9 px-2 md:px-3 rounded-md border text-xs md:text-sm font-bold ${
                         page === currentPage
                           ? 'bg-blue-600 text-white border-blue-600'
                           : typeof page === 'number'
@@ -430,13 +530,13 @@ Tank Testing Plant`;
                   <button
                     onClick={goToNextPage}
                     disabled={currentPage === totalPages}
-                    className={`px-3 py-1 rounded-md border ${
+                    className={`px-2 md:px-3 py-1 rounded-md border ${
                       currentPage === totalPages
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
                     }`}
                   >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                     </svg>
                   </button>
