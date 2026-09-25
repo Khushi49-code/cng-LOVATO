@@ -40,7 +40,8 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   // ── WhatsApp Message Send (Gujarati) ───────────────────────────
-  const sendWhatsAppReminder = (customerName: string, vehicleNumber: string, expiryDate: string, productName: string) => {
+  // 👇 CHANGED: now takes mobileNumber and opens chat directly on that number
+  const sendWhatsAppReminder = (customerName: string, vehicleNumber: string, expiryDate: string, productName: string, mobileNumber: string) => {
     const message = `પ્રિય ${customerName},
 
 તમારી ${productName} (વાહન નંબર: ${vehicleNumber}) ની વોરંટી ${formatDate(expiryDate)} ના રોજ સમાપ્ત થાય છે.
@@ -48,15 +49,29 @@ const AdminDashboard: React.FC = () => {
 કૃપા કરીને નવીકરણ (renewal) અથવા સર્વિસ માટે અમારી મુલાકાત લો.
 
 આભાર,
-Tank Testing Plant`;
+Sai Motors`;
 
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+
+    // 👇 CHANGED: clean number and prepend country code if needed
+    let cleanNumber = (mobileNumber || "").replace(/[^\d]/g, "");
+    if (cleanNumber.length === 10) {
+      cleanNumber = "91" + cleanNumber; // India code — adjust if needed
+    }
+
+    if (!cleanNumber) {
+      alert("❌ Customer mobile number not found");
+      return;
+    }
+
+    // 👇 CHANGED: wa.me/<number> instead of wa.me/?text=...
+    const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodedMessage}`;
     window.open(whatsappUrl, '_blank');
   };
 
   // ── Send Reminder with Database Update ──────────────────────
-  const handleSendReminder = async (mappingId: string, customerName: string, vehicleNumber: string, expiryDate: string, productName: string) => {
+  // 👇 CHANGED: now takes mobileNumber and passes it through
+  const handleSendReminder = async (mappingId: string, customerName: string, vehicleNumber: string, expiryDate: string, productName: string, mobileNumber: string) => {
     if (window.confirm(`Send WhatsApp reminder to ${customerName}?`)) {
       try {
         const result = await updateItem(COLLECTIONS.MAPPINGS, mappingId, {
@@ -70,7 +85,7 @@ Tank Testing Plant`;
           // ✅ Mark that we opened WhatsApp — will refresh when user returns
           pendingWhatsAppRefresh.current = true;
 
-          sendWhatsAppReminder(customerName, vehicleNumber, expiryDate, productName);
+          sendWhatsAppReminder(customerName, vehicleNumber, expiryDate, productName, mobileNumber);
           await refreshData();
           alert(`✅ WhatsApp reminder sent successfully to ${customerName}`);
         } else {
@@ -367,7 +382,8 @@ Tank Testing Plant`;
                               reminder.customer_name,
                               reminder.vehicle_number,
                               reminder.expiry_date,
-                              reminder.product_name
+                              reminder.product_name,
+                              reminder.mobile_number // 👈 CHANGED: pass mobile number
                             )
                           }
                           color="blue"
@@ -459,7 +475,8 @@ Tank Testing Plant`;
                           reminder.customer_name,
                           reminder.vehicle_number,
                           reminder.expiry_date,
-                          reminder.product_name
+                          reminder.product_name,
+                          reminder.mobile_number // 👈 CHANGED: pass mobile number
                         )
                       }
                       disabled={!meta.isOnline}
